@@ -1,0 +1,6 @@
+{
+  "category_accuracy": 0.7045454545454546,
+  "urgency_accuracy": 0.5833333333333334,
+  "category_f1_macro": 0.6952564102564103,
+  "urgency_f1_macro": 0.5916666666666667
+}

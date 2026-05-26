@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SupportAI — Customer Support Ticket Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0e0f17;--bg2:#141520;--bg3:#1a1c2e;--bg4:#1f2235;
+  --border:#2a2d45;--border2:#353860;
+  --text:#e8eaf6;--text2:#9499c4;--text3:#5a5f8a;
+  --blue:#4f7cff;--blue2:#6b94ff;--purple:#9b59f5;--purple2:#b07eff;
+  --teal:#00d4aa;--red:#ff4d6d;--orange:#ff8c42;--yellow:#ffd166;
+  --green:#06d6a0;--pink:#f72585;
+  --font:'Plus Jakarta Sans',sans-serif;--mono:'JetBrains Mono',monospace;
+  --sidebar:220px;--radius:14px;--radius-sm:8px;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+a{text-decoration:none;color:inherit;}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none;}
+textarea,input,select{font-family:var(--font);}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+/* SIDEBAR */
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;transition:transform 0.3s;}
+.sidebar-logo{padding:22px 20px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--purple),var(--blue));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.logo-text{font-size:17px;font-weight:800;letter-spacing:-0.3px;}
+.logo-text span{color:var(--blue2);}
+.sidebar-nav{flex:1;padding:14px 12px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:var(--radius-sm);font-size:13.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all 0.18s;}
+.nav-item:hover{background:var(--bg3);color:var(--text);}
+.nav-item.active{background:linear-gradient(135deg,rgba(79,124,255,0.18),rgba(155,89,245,0.12));color:var(--blue2);border:1px solid rgba(79,124,255,0.25);}
+.nav-item svg{width:17px;height:17px;flex-shrink:0;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;}
+.sidebar-footer{padding:14px 16px;border-top:1px solid var(--border);}
+.model-status{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.status-dot-green{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse-green 2s infinite;}
+@keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(6,214,160,0.4);}50%{box-shadow:0 0 0 5px rgba(6,214,160,0);}}
+.model-name{font-size:12px;color:var(--text2);font-family:var(--mono);}
+.model-name strong{display:block;color:var(--text);font-size:11px;margin-top:1px;}
+.accuracy-display{background:var(--bg3);border-radius:var(--radius-sm);padding:10px 12px;border:1px solid var(--border);}
+.acc-label{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);}
+.acc-value{font-size:26px;font-weight:800;color:var(--green);font-family:var(--mono);margin-top:2px;}
+.acc-sub{font-size:10px;color:var(--text3);margin-top:1px;}
+
+/* OVERLAY for mobile */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99;}
+.sidebar-overlay.show{display:block;}
+
+/* MAIN */
+.main{margin-left:var(--sidebar);min-height:100vh;display:flex;flex-direction:column;}
+.topbar{height:60px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:50;}
+.topbar-left{display:flex;align-items:center;gap:12px;}
+.hamburger{background:none;border:none;cursor:pointer;padding:4px;display:none;}
+.page-title{font-size:20px;font-weight:800;letter-spacing:-0.3px;}
+.page-title .h1{color:var(--blue2);}
+.page-title .h2{color:var(--purple2);}
+.page-subtitle{font-size:12px;color:var(--text3);margin-top:1px;}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+.datetime{font-size:12px;color:var(--text3);font-family:var(--mono);text-align:right;}
+.topbar-btn{width:36px;height:36px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.18s;color:var(--text2);position:relative;}
+.topbar-btn:hover{background:var(--bg4);color:var(--text);}
+.notif-badge{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;font-size:9px;font-weight:700;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:pointer;}
+.user-info{font-size:13px;font-weight:600;}
+.user-role{font-size:11px;color:var(--text3);}
+
+/* CONTENT */
+.content{flex:1;padding:22px 24px;overflow-y:auto;}
+
+/* STAT CARDS */
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;display:flex;align-items:center;gap:14px;transition:all 0.2s;cursor:default;}
+.stat-card:hover{border-color:var(--border2);transform:translateY(-1px);}
+.stat-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.si-blue{background:rgba(79,124,255,0.15);}
+.si-purple{background:rgba(155,89,245,0.15);}
+.si-teal{background:rgba(0,212,170,0.15);}
+.si-red{background:rgba(255,77,109,0.15);}
+.si-orange{background:rgba(255,140,66,0.15);}
+.stat-label{font-size:11px;color:var(--text3);letter-spacing:0.5px;text-transform:uppercase;font-family:var(--mono);}
+.stat-value{font-size:22px;font-weight:800;margin:2px 0;letter-spacing:-0.5px;transition:all 0.3s;}
+.stat-change{font-size:11px;display:flex;align-items:center;gap:3px;}
+.up{color:var(--green);}
+.down{color:var(--red);}
+
+/* GRID */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;}
+
+/* CARD */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.card-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.card-body{padding:16px 18px;}
+
+/* PREDICT */
+.predict-area{padding:16px 18px 0;}
+.predict-label{font-size:12px;color:var(--text3);margin-bottom:8px;}
+.ticket-textarea{width:100%;height:110px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text);font-size:13.5px;resize:none;transition:border-color 0.18s;line-height:1.6;}
+.ticket-textarea:focus{outline:none;border-color:var(--blue);}
+.ticket-textarea::placeholder{color:var(--text3);}
+.textarea-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 0 14px;}
+.char-cnt{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.toggle-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);}
+.toggle{width:38px;height:20px;background:var(--blue);border-radius:999px;position:relative;cursor:pointer;}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.2s;transform:translateX(18px);}
+.btn-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:0 18px 16px;}
+.btn-analyze{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;border:none;border-radius:var(--radius-sm);padding:11px 18px;font-size:13.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity 0.18s,transform 0.1s;}
+.btn-analyze:hover{opacity:0.9;transform:translateY(-1px);}
+.btn-analyze:active{transform:scale(0.98);}
+.btn-analyze:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+.btn-clear{background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-sm);padding:11px 18px;font-size:13px;font-weight:600;transition:all 0.18s;}
+.btn-clear:hover{border-color:var(--border2);color:var(--text);}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:none;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* RESULT */
+.result-area{padding:16px 18px;min-height:180px;}
+.result-empty{text-align:center;padding:30px 10px;color:var(--text3);}
+.result-empty-icon{font-size:28px;margin-bottom:8px;}
+.result-empty-text{font-size:12px;font-family:var(--mono);}
+.result-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.result-cat-wrap{display:flex;flex-direction:column;gap:3px;}
+.result-cat-label{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);}
+.result-cat-value{font-size:22px;font-weight:800;letter-spacing:-0.5px;}
+.urgency-pill{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:700;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;gap:6px;}
+.u-critical{background:rgba(255,77,109,0.15);color:var(--red);border:1px solid rgba(255,77,109,0.3);}
+.u-high{background:rgba(255,140,66,0.15);color:var(--orange);border:1px solid rgba(255,140,66,0.3);}
+.u-medium{background:rgba(255,209,102,0.15);color:var(--yellow);border:1px solid rgba(255,209,102,0.3);}
+.u-low{background:rgba(6,214,160,0.15);color:var(--green);border:1px solid rgba(6,214,160,0.3);}
+.conf-section{margin-bottom:14px;}
+.conf-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:5px;}
+.conf-bar{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+.conf-fill{height:100%;border-radius:3px;transition:width 0.8s cubic-bezier(0.22,1,0.36,1);width:0%;}
+.fill-blue{background:linear-gradient(90deg,var(--blue),var(--blue2));}
+.fill-purple{background:linear-gradient(90deg,var(--purple),var(--purple2));}
+.fill-red{background:linear-gradient(90deg,var(--red),var(--pink));}
+.fill-teal{background:linear-gradient(90deg,var(--teal),var(--green));}
+.fill-yellow{background:linear-gradient(90deg,var(--orange),var(--yellow));}
+.big-conf{text-align:center;background:var(--bg3);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;}
+.big-conf-label{font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:4px;}
+.big-conf-val{font-size:32px;font-weight:800;color:var(--blue2);}
+.conf-bar-big{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;margin-top:8px;}
+.conf-fill-big{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--blue),var(--purple));transition:width 0.9s cubic-bezier(0.22,1,0.36,1);width:0%;}
+.keywords-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.kw-tag{background:rgba(79,124,255,0.1);border:1px solid rgba(79,124,255,0.25);border-radius:6px;padding:3px 10px;font-size:11px;color:var(--blue2);font-family:var(--mono);}
+
+/* LIVE FEED */
+.live-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);animation:slideIn 0.4s ease;}
+@keyframes slideIn{from{opacity:0;transform:translateX(10px);}to{opacity:1;transform:translateX(0);}}
+.live-item:last-child{border-bottom:none;}
+.live-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.live-text{flex:1;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cat-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;font-family:var(--mono);flex-shrink:0;}
+.tag-billing{background:rgba(79,124,255,0.15);color:var(--blue2);}
+.tag-technical{background:rgba(155,89,245,0.15);color:var(--purple2);}
+.tag-complaint{background:rgba(255,77,109,0.15);color:var(--red);}
+.tag-general{background:rgba(0,212,170,0.15);color:var(--teal);}
+.live-time{font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0;}
+
+/* CHARTS */
+.chart-wrap{position:relative;display:flex;align-items:center;gap:20px;padding:10px 0;}
+.chart-canvas{width:140px!important;height:140px!important;flex-shrink:0;}
+.chart-legend{display:flex;flex-direction:column;gap:8px;flex:1;}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);}
+.legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.legend-val{margin-left:auto;font-size:12px;font-weight:600;color:var(--text);font-family:var(--mono);}
+.bar-chart-wrap{padding:6px 0;}
+.bar-item{margin-bottom:12px;}
+.bar-label-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:5px;}
+.bar-track{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width 0.8s ease;}
+.model-bars{padding:0 18px 16px;}
+.mb-item{margin-bottom:14px;}
+.mb-row{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:5px;}
+.mb-val{font-weight:700;color:var(--text);font-family:var(--mono);}
+.mb-track{height:28px;background:var(--bg3);border-radius:6px;overflow:hidden;position:relative;}
+.mb-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);transition:width 1s ease;}
+
+/* AUTO REPLY */
+.auto-reply-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px;}
+.ar-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.ar-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.ar-title{font-size:14px;font-weight:700;}
+.ar-body{background:var(--bg3);border-radius:var(--radius-sm);padding:14px 16px;font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px;border:1px solid var(--border);}
+.ar-footer{display:flex;gap:10px;justify-content:flex-end;}
+.btn-use-reply{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;border:none;border-radius:var(--radius-sm);padding:9px 18px;font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;transition:opacity 0.18s;}
+.btn-use-reply:hover{opacity:0.88;}
+
+/* DROPDOWN */
+.dropdown{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text2);cursor:pointer;}
+
+/* SECTION HEADER */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.section-hdr-title{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);font-family:var(--mono);}
+.view-all{font-size:12px;color:var(--blue2);font-weight:600;cursor:pointer;}
+.view-all:hover{text-decoration:underline;}
+
+/* ANALYTICS */
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.mini-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.mini-stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.ms-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--mono);}
+.ms-val{font-size:24px;font-weight:800;margin-top:4px;}
+.ms-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+
+/* HISTORY */
+.history-table{width:100%;border-collapse:collapse;}
+.history-table th{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-family:var(--mono);font-weight:600;padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);}
+.history-table td{padding:11px 14px;font-size:13px;border-bottom:1px solid var(--border);color:var(--text2);}
+.history-table tr:hover td{background:var(--bg3);}
+.history-table tr:last-child td{border-bottom:none;}
+
+/* BATCH */
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:20px;background:var(--bg3);}
+.upload-zone:hover{border-color:var(--blue);background:rgba(79,124,255,0.05);}
+.upload-icon{font-size:36px;margin-bottom:10px;}
+.upload-title{font-size:15px;font-weight:700;margin-bottom:6px;}
+.upload-sub{font-size:13px;color:var(--text3);}
+
+/* SETTINGS */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.setting-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.setting-title{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.setting-item{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.setting-label{font-size:13px;color:var(--text2);}
+.setting-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.toggle2{width:42px;height:22px;background:var(--blue);border-radius:999px;position:relative;cursor:pointer;flex-shrink:0;}
+.toggle2::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform 0.2s;transform:translateX(20px);}
+.toggle2.off{background:var(--bg3);}
+.toggle2.off::after{transform:translateX(0);}
+.input-field{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 12px;color:var(--text);font-size:13px;width:130px;}
+.input-field:focus{outline:none;border-color:var(--blue);}
+
+/* PAGES */
+.page{display:none;}
+.page.active{display:block;}
+
+/* ANIMATIONS */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.fade-in{animation:fadeIn 0.3s ease;}
+@keyframes countUp{from{opacity:0;transform:scale(0.9);}to{opacity:1;transform:scale(1);}}
+.count-updated{animation:countUp 0.4s ease;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg4);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;z-index:999;animation:fadeIn 0.3s ease;display:flex;align-items:center;gap:10px;}
+
+/* RESPONSIVE */
+@media(max-width:1200px){.stats-row{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0;}
+  .hamburger{display:flex;}
+  .grid-2,.grid-3,.analytics-grid{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+  .mini-stat-grid{grid-template-columns:repeat(2,1fr);}
+  .settings-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🤖</div>
+    <div class="logo-text">Support<span>AI</span></div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-item active" onclick="showPage('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('predict',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Predict Ticket
+    </div>
+    <div class="nav-item" onclick="showPage('batch',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Batch Prediction
+    </div>
+    <div class="nav-item" onclick="showPage('analytics',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Analytics
+    </div>
+    <div class="nav-item" onclick="showPage('history',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Ticket History
+      <span class="nav-badge" id="historyBadge">0</span>
+    </div>
+    <div class="nav-item" onclick="showPage('autoreply',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Auto Reply
+    </div>
+    <div class="nav-item" onclick="showPage('model',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Model Performance
+    </div>
+    <div class="nav-item" onclick="showPage('settings',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </div>
+    <div class="nav-item" style="margin-top:8px;color:var(--red);" onclick="showLogout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Logout
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="model-status">
+      <div class="status-dot-green"></div>
+      <div class="model-name">Model Status<strong>Online · ML Classifier</strong></div>
+    </div>
+    <div class="accuracy-display">
+      <div class="acc-label">Session Tickets</div>
+      <div class="acc-value" id="sidebarSessionCount">0</div>
+      <div class="acc-sub" id="sidebarAccSub">Classify tickets to get started</div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger topbar-btn" onclick="toggleSidebar()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div>
+        <div class="page-title">Customer <span class="h1">Support</span> Ticket <span class="h2">Classifier</span></div>
+        <div class="page-subtitle" id="topbarSubtitle">AI-Powered ticket classification and urgency detection</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="datetime" id="datetimeDisplay"></div>
+      <div class="topbar-btn" title="Toggle Theme" onclick="showToast('Theme toggle coming soon!','🎨')">🌙</div>
+      <div class="topbar-btn" title="Notifications" style="position:relative;">
+        🔔<div class="notif-badge" id="notifBadge">3</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <div class="avatar">S</div>
+        <div>
+          <div class="user-info">Soni</div>
+          <div class="user-role">Admin</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- ========== DASHBOARD PAGE ========== -->
+    <div class="page active fade-in" id="page-dashboard">
+      <!-- STATS -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon si-blue">📋</div>
+          <div class="stat-info">
+            <div class="stat-label">Total Tickets</div>
+            <div class="stat-value" id="s-total">24,532</div>
+            <div class="stat-change up" id="s-total-sub">▲ 12.5% vs last month</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-purple">💳</div>
+          <div class="stat-info">
+            <div class="stat-label">Billing</div>
+            <div class="stat-value" style="color:var(--blue2)" id="s-billing">8,245</div>
+            <div class="stat-change" style="color:var(--text3)" id="s-billing-pct">33.6% of total</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-teal">🔧</div>
+          <div class="stat-info">
+            <div class="stat-label">Technical</div>
+            <div class="stat-value" style="color:var(--purple2)" id="s-tech">9,842</div>
+            <div class="stat-change" style="color:var(--text3)" id="s-tech-pct">40.1% of total</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-red">😡</div>
+          <div class="stat-info">
+            <div class="stat-label">Complaint</div>
+            <div class="stat-value" style="color:var(--red)" id="s-complaint">4,102</div>
+            <div class="stat-change" style="color:var(--text3)" id="s-complaint-pct">16.7% of total</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon si-orange">⚡</div>
+          <div class="stat-info">
+            <div class="stat-label">High Urgency</div>
+            <div class="stat-value" style="color:var(--orange)" id="s-urgent">3,129</div>
+            <div class="stat-change up" id="s-urgent-pct">▲ 12.7% of total</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MIDDLE ROW -->
+      <div class="grid-2" style="grid-template-columns:1.1fr 0.9fr">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">✨ Predict Ticket</div>
+            <div class="toggle-row">
+              <span style="font-size:12px;color:var(--text2);">Real-time mode</span>
+              <div class="toggle" title="Real-time ON"></div>
+            </div>
+          </div>
+          <div class="predict-area">
+            <div class="predict-label">Enter customer message</div>
+            <textarea class="ticket-textarea" id="mainTextarea" placeholder="Type or paste a customer support message...&#10;e.g. 'I was charged twice for my subscription and still haven't received a refund. Please help me immediately!'" oninput="updateCharCount(this,'mainCharCount',500)"></textarea>
+            <div class="textarea-footer">
+              <span class="char-cnt" id="mainCharCount">0/500</span>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn-analyze" id="mainAnalyzeBtn" onclick="analyzeMain()">
+              <div class="spin" id="mainSpin"></div>
+              <span id="mainBtnTxt">✨ Analyze Ticket</span>
+            </button>
+            <button class="btn-clear" onclick="clearMain()">Clear</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎯 Prediction Result</div>
+          </div>
+          <div class="result-area" id="mainResult">
+            <div class="result-empty" id="mainEmpty">
+              <div class="result-empty-icon">🎯</div>
+              <div class="result-empty-text">Submit a ticket to<br>see results here</div>
+            </div>
+            <div id="mainResultContent" style="display:none;">
+              <div class="result-top">
+                <div class="result-cat-wrap">
+                  <div class="result-cat-label">Category</div>
+                  <div class="result-cat-value" id="mainCatValue">—</div>
+                </div>
+                <div>
+                  <div class="result-cat-label" style="text-align:right;">Urgency</div>
+                  <div class="urgency-pill" id="mainUrgPill" style="margin-top:3px;">—</div>
+                </div>
+              </div>
+              <div class="big-conf">
+                <div class="big-conf-label">Confidence Score</div>
+                <div class="big-conf-val" id="mainConfVal">—%</div>
+                <div class="conf-bar-big"><div class="conf-fill-big" id="mainConfBar"></div></div>
+              </div>
+              <div style="font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:7px;">Top Keywords</div>
+              <div class="keywords-row" id="mainKeywords"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW: CHARTS + LIVE FEED -->
+      <div class="grid-3">
+        <!-- TICKET DISTRIBUTION -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📊 Ticket Distribution</div>
+            <select class="dropdown" onchange="filterDistributionChart(this.value)">
+              <option value="all">All Time</option>
+              <option value="session">This Session</option>
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <canvas id="donutChart" class="chart-canvas"></canvas>
+              <div class="chart-legend" id="donutLegend">
+                <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Billing<span class="legend-val" id="leg-billing">8,245</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Technical<span class="legend-val" id="leg-technical">9,842</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Complaint<span class="legend-val" id="leg-complaint">4,102</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>General<span class="legend-val" id="leg-general">2,343</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- URGENCY DISTRIBUTION -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🚨 Urgency Distribution</div>
+            <select class="dropdown" onchange="filterUrgencyChart(this.value)">
+              <option value="all">All Time</option>
+              <option value="session">This Session</option>
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap">
+              <canvas id="urgencyChart" class="chart-canvas"></canvas>
+              <div class="chart-legend">
+                <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Low<span class="legend-val" id="leg-urg-low">21,403</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Medium<span class="legend-val" id="leg-urg-medium">—</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>High<span class="legend-val" id="leg-urg-high">2,614</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Critical<span class="legend-val" id="leg-urg-critical">515</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIVE PREDICTIONS -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📡 Live Predictions</div>
+            <span class="view-all" onclick="showPage('history',document.querySelectorAll('.nav-item')[4])">View all →</span>
+          </div>
+          <div class="card-body" style="padding:10px 18px;">
+            <div id="liveFeed"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUTO REPLY -->
+      <div class="auto-reply-card" id="mainAutoReply" style="display:none;">
+        <div class="ar-header">
+          <div class="ar-icon">💬</div>
+          <div class="ar-title">Recommended Action & Auto Reply</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <div style="font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:6px;">Recommended Action</div>
+            <div class="ar-body" id="mainActionText" style="margin-bottom:0;font-size:12px;"></div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:6px;">Suggested Reply</div>
+            <div class="ar-body" id="mainAutoReplyText" style="margin-bottom:0;font-size:12px;"></div>
+          </div>
+        </div>
+        <div class="ar-footer" style="margin-top:12px;">
+          <button class="btn-use-reply" onclick="copyReply()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy Reply
+          </button>
+        </div>
+      </div>
+
+      <!-- MODEL PERFORMANCE MINI -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📈 Model Performance</div>
+          <span class="view-all" onclick="showPage('model',document.querySelectorAll('.nav-item')[6])">View full →</span>
+        </div>
+        <div class="model-bars">
+          <br/>
+          <div class="mb-item"><div class="mb-row"><span>DistilBERT</span><span class="mb-val">94.7%</span></div><div class="mb-track"><div class="mb-fill" style="width:94.7%;background:linear-gradient(90deg,var(--blue),var(--blue2))">94.7%</div></div></div>
+          <div class="mb-item"><div class="mb-row"><span>RoBERTa</span><span class="mb-val">93.1%</span></div><div class="mb-track"><div class="mb-fill" style="width:93.1%;background:linear-gradient(90deg,var(--purple),var(--purple2))">93.1%</div></div></div>
+          <div class="mb-item"><div class="mb-row"><span>SVM</span><span class="mb-val">88.2%</span></div><div class="mb-track"><div class="mb-fill" style="width:88.2%;background:linear-gradient(90deg,var(--red),var(--pink))">88.2%</div></div></div>
+          <div class="mb-item"><div class="mb-row"><span>Logistic Regression</span><span class="mb-val">85.3%</span></div><div class="mb-track"><div class="mb-fill" style="width:85.3%;background:linear-gradient(90deg,var(--orange),var(--yellow))">85.3%</div></div></div>
+          <div class="mb-item"><div class="mb-row"><span>Naive Bayes (TF-IDF)</span><span class="mb-val">81.6%</span></div><div class="mb-track"><div class="mb-fill" style="width:81.6%;background:linear-gradient(90deg,var(--teal),var(--green))">81.6%</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== PREDICT PAGE ========== -->
+    <div class="page fade-in" id="page-predict">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">🔍 Predict Ticket</h2>
+        <p style="font-size:13px;color:var(--text3);">Classify a single customer support message with full breakdown</p>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Enter Customer Message</div></div>
+          <div class="predict-area">
+            <div class="predict-label">Paste or type ticket text</div>
+            <textarea class="ticket-textarea" id="p2Textarea" style="height:160px;" placeholder="Enter customer support message..." oninput="updateCharCount(this,'p2CharCount',1000)"></textarea>
+            <div class="textarea-footer"><span class="char-cnt" id="p2CharCount">0/1000</span></div>
+          </div>
+          <div style="padding:0 18px 18px;display:flex;gap:10px;">
+            <button class="btn-analyze" id="p2AnalyzeBtn" style="flex:1;" onclick="analyzeP2()">
+              <div class="spin" id="p2Spin"></div>
+              <span id="p2BtnTxt">✨ Analyze</span>
+            </button>
+            <button class="btn-clear" onclick="document.getElementById('p2Textarea').value='';updateCharCount(document.getElementById('p2Textarea'),'p2CharCount',1000);document.getElementById('p2Empty').style.display='block';document.getElementById('p2ResultContent').style.display='none';">Clear</button>
+          </div>
+          <div style="padding:0 18px 14px;">
+            <div style="font-size:11px;color:var(--text3);margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);">Sample Tickets</div>
+            <div style="display:flex;flex-direction:column;gap:6px;" id="sampleTickets"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🧠 Full Analysis</div></div>
+          <div class="result-area" id="p2Result" style="min-height:300px;">
+            <div class="result-empty" id="p2Empty">
+              <div class="result-empty-icon">🧠</div>
+              <div class="result-empty-text">Full breakdown<br>will appear here</div>
+            </div>
+            <div id="p2ResultContent" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== BATCH PAGE ========== -->
+    <div class="page fade-in" id="page-batch">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">📦 Batch Prediction</h2>
+        <p style="font-size:13px;color:var(--text3);">Upload a CSV file with customer messages for bulk classification</p>
+      </div>
+      <div class="upload-zone" onclick="document.getElementById('csvUpload').click()">
+        <input type="file" id="csvUpload" accept=".csv" style="display:none;" onchange="handleCSV(this)"/>
+        <div class="upload-icon">📂</div>
+        <div class="upload-title">Drop your CSV file here or click to browse</div>
+        <div class="upload-sub">Supports: .csv · Max size: 50MB · Expected column: "text" or "tweet_text"</div>
+      </div>
+      <div class="card" id="batchResults" style="display:none;">
+        <div class="card-header">
+          <div class="card-title">📊 Batch Results <span id="batchCount" style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-left:8px;"></span></div>
+          <button class="btn-analyze" style="padding:7px 14px;font-size:12px;" onclick="downloadResults()">⬇ Download CSV</button>
+        </div>
+        <div class="card-body">
+          <div style="overflow-x:auto;">
+            <table class="history-table" id="batchTable">
+              <thead><tr><th>#</th><th>Message</th><th>Category</th><th>Urgency</th><th>Confidence</th><th>Action</th></tr></thead>
+              <tbody id="batchTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header"><div class="card-title">📋 Format Guide</div></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--text2);margin-bottom:10px;">Your CSV should have at least one column with ticket text:</p>
+          <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:14px;font-family:var(--mono);font-size:12px;color:var(--teal);border:1px solid var(--border);">
+            tweet_text,author_id,created_at<br>
+            "@AmazonHelp my order is delayed",USR123,2025-01-01<br>
+            "@Uber charged twice for same ride",USR456,2025-01-01<br>
+            "@Delta flight cancelled no refund",USR789,2025-01-01
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== ANALYTICS PAGE ========== -->
+    <div class="page fade-in" id="page-analytics">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">📊 Analytics</h2>
+        <p style="font-size:13px;color:var(--text3);">Detailed breakdown of ticket patterns and model performance</p>
+      </div>
+      <div class="mini-stat-grid">
+        <div class="mini-stat"><div class="ms-label">Avg Response Time</div><div class="ms-val" style="color:var(--blue2)">2.4h</div><div class="ms-sub">▼ 18% faster</div></div>
+        <div class="mini-stat"><div class="ms-label">Resolution Rate</div><div class="ms-val" style="color:var(--green)">87.3%</div><div class="ms-sub">▲ 5.1% vs last week</div></div>
+        <div class="mini-stat"><div class="ms-label">CSAT Score</div><div class="ms-val" style="color:var(--yellow)">4.6/5</div><div class="ms-sub">Based on 1,247 reviews</div></div>
+        <div class="mini-stat"><div class="ms-label">Escalation Rate</div><div class="ms-val" style="color:var(--red)">8.2%</div><div class="ms-sub">▼ 2.3% vs last month</div></div>
+      </div>
+      <div class="analytics-grid">
+        <div class="card">
+          <div class="card-header"><div class="card-title">📈 Tickets Over Time</div><select class="dropdown"><option>Last 7 Days</option><option>Last 30 Days</option></select></div>
+          <div class="card-body"><canvas id="lineChart" style="height:180px;"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">🏢 Top Companies by Volume</div></div>
+          <div class="card-body">
+            <div class="bar-chart-wrap">
+              <div class="bar-item"><div class="bar-label-row"><span>Amazon</span><span style="font-family:var(--mono)">4,821</span></div><div class="bar-track"><div class="bar-fill" style="width:92%;background:var(--blue)"></div></div></div>
+              <div class="bar-item"><div class="bar-label-row"><span>Apple</span><span style="font-family:var(--mono)">3,654</span></div><div class="bar-track"><div class="bar-fill" style="width:70%;background:var(--purple)"></div></div></div>
+              <div class="bar-item"><div class="bar-label-row"><span>Uber</span><span style="font-family:var(--mono)">2,910</span></div><div class="bar-track"><div class="bar-fill" style="width:56%;background:var(--teal)"></div></div></div>
+              <div class="bar-item"><div class="bar-label-row"><span>Delta Airlines</span><span style="font-family:var(--mono)">2,345</span></div><div class="bar-track"><div class="bar-fill" style="width:45%;background:var(--orange)"></div></div></div>
+              <div class="bar-item"><div class="bar-label-row"><span>Netflix</span><span style="font-family:var(--mono)">1,802</span></div><div class="bar-track"><div class="bar-fill" style="width:35%;background:var(--red)"></div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">😤 Sentiment Trend</div></div>
+          <div class="card-body"><canvas id="sentimentChart" style="height:180px;"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">⏰ Hourly Distribution</div></div>
+          <div class="card-body"><canvas id="hourlyChart" style="height:180px;"></canvas></div>
+        </div>
+      </div>
+      <!-- Session analytics -->
+      <div class="card" id="sessionAnalyticsCard">
+        <div class="card-header"><div class="card-title">🔴 This Session — Live Stats</div></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;" id="sessionStatsGrid">
+            <div style="text-align:center;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;">Classified</div>
+              <div style="font-size:28px;font-weight:800;color:var(--blue2);margin-top:6px;" id="an-total">0</div>
+            </div>
+            <div style="text-align:center;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;">Critical/High</div>
+              <div style="font-size:28px;font-weight:800;color:var(--red);margin-top:6px;" id="an-urgent">0</div>
+            </div>
+            <div style="text-align:center;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;">Avg Confidence</div>
+              <div style="font-size:28px;font-weight:800;color:var(--green);margin-top:6px;" id="an-conf">—</div>
+            </div>
+            <div style="text-align:center;padding:14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;">Top Category</div>
+              <div style="font-size:20px;font-weight:800;color:var(--purple2);margin-top:6px;" id="an-topcat">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== HISTORY PAGE ========== -->
+    <div class="page fade-in" id="page-history">
+      <div style="margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">🕐 Ticket History</h2>
+          <p style="font-size:13px;color:var(--text3);">All classified tickets from this session</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn-clear" onclick="exportHistory()" style="padding:9px 16px;font-size:12.5px;">⬇ Export CSV</button>
+          <button class="btn-analyze" style="padding:9px 16px;font-size:12.5px;background:linear-gradient(135deg,var(--red),var(--pink));" onclick="clearHistory()">🗑 Clear History</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0;">
+          <div style="overflow-x:auto;">
+            <table class="history-table">
+              <thead><tr><th>#</th><th>Timestamp</th><th>Message Preview</th><th>Category</th><th>Urgency</th><th>Confidence</th><th>SLA</th></tr></thead>
+              <tbody id="historyTbody">
+                <tr><td colspan="7" style="text-align:center;color:var(--text3);padding:30px;font-family:var(--mono);">No tickets classified yet. Use Predict Ticket to get started.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== AUTO REPLY PAGE ========== -->
+    <div class="page fade-in" id="page-autoreply">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">💬 Auto Reply Generator</h2>
+        <p style="font-size:13px;color:var(--text3);">AI-generated empathetic responses for classified tickets</p>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Customer Message</div></div>
+          <div class="predict-area">
+            <textarea class="ticket-textarea" id="arTextarea" style="height:140px;" placeholder="Paste a customer ticket here..." oninput="updateCharCount(this,'arCharCount',500)"></textarea>
+            <div class="textarea-footer"><span class="char-cnt" id="arCharCount">0/500</span></div>
+          </div>
+          <div style="padding:0 18px 16px;display:flex;gap:10px;">
+            <button class="btn-analyze" id="arBtn" style="flex:1;" onclick="generateReply()">
+              <div class="spin" id="arSpin"></div>
+              <span id="arBtnTxt">💬 Generate Reply</span>
+            </button>
+            <button class="btn-clear" onclick="document.getElementById('arTextarea').value='';document.getElementById('arCharCount').textContent='0/500';">Clear</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">✍ Generated Reply</div></div>
+          <div class="card-body" id="arReplyArea">
+            <div class="result-empty">
+              <div class="result-empty-icon">✍</div>
+              <div class="result-empty-text">Reply will appear here</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header"><div class="card-title">📚 Reply Templates</div></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;" id="replyTemplates"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== MODEL PAGE ========== -->
+    <div class="page fade-in" id="page-model">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">📈 Model Performance</h2>
+        <p style="font-size:13px;color:var(--text3);">Evaluation metrics for all trained classifiers on Twitter CS Dataset</p>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><div class="card-title">🏆 Model Comparison</div></div>
+        <div class="card-body" style="padding:0;">
+          <table class="history-table">
+            <thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:700;color:var(--blue2);">DistilBERT</td><td style="color:var(--green);">94.7%</td><td>93.8%</td><td>94.1%</td><td>0.943</td><td><span class="cat-tag" style="background:rgba(6,214,160,0.15);color:var(--green);">ACTIVE</span></td></tr>
+              <tr><td style="font-weight:700;color:var(--purple2);">RoBERTa</td><td>93.1%</td><td>92.4%</td><td>93.0%</td><td>0.927</td><td><span class="cat-tag tag-billing">IDLE</span></td></tr>
+              <tr><td>SVM (TF-IDF)</td><td>88.2%</td><td>87.6%</td><td>88.0%</td><td>0.878</td><td><span class="cat-tag tag-billing">IDLE</span></td></tr>
+              <tr><td>Logistic Regression</td><td>85.3%</td><td>84.9%</td><td>85.1%</td><td>0.850</td><td><span class="cat-tag tag-billing">IDLE</span></td></tr>
+              <tr><td>Naive Bayes (TF-IDF)</td><td>81.6%</td><td>80.8%</td><td>81.3%</td><td>0.810</td><td><span class="cat-tag tag-billing">IDLE</span></td></tr>
+              <tr><td>Random Forest</td><td>83.4%</td><td>82.7%</td><td>83.2%</td><td>0.829</td><td><span class="cat-tag tag-billing">IDLE</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🔬 NLP Pipeline</div></div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);"><span style="font-size:16px;">🔤</span><div style="flex:1;font-size:13px;">NLTK Tokenization + Stopword Removal</div><span style="color:var(--green);font-size:11px;font-family:var(--mono);">✓ ACTIVE</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);"><span style="font-size:16px;">🌱</span><div style="flex:1;font-size:13px;">Porter Stemmer / Lemmatization</div><span style="color:var(--green);font-size:11px;font-family:var(--mono);">✓ ACTIVE</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);"><span style="font-size:16px;">📊</span><div style="flex:1;font-size:13px;">TF-IDF Vectorizer (n-gram 1,2 · 5000 features)</div><span style="color:var(--green);font-size:11px;font-family:var(--mono);">✓ ACTIVE</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);"><span style="font-size:16px;">🔮</span><div style="flex:1;font-size:13px;">ML Classifier (category + urgency models)</div><span style="color:var(--blue2);font-size:11px;font-family:var(--mono);">★ PRIMARY</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);"><span style="font-size:16px;">🚨</span><div style="flex:1;font-size:13px;">Rule-based Urgency Detection</div><span style="color:var(--green);font-size:11px;font-family:var(--mono);">✓ ACTIVE</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📋 Dataset Info</div></div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);">
+                <div style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;">Source</div>
+                <div style="font-size:13px;font-weight:600;margin-top:3px;color:var(--blue2);">Kaggle · Customer Support on Twitter</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);"><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">TOTAL ROWS</div><div style="font-size:20px;font-weight:800;margin-top:3px;">2.8M</div></div>
+                <div style="background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);"><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">COMPANIES</div><div style="font-size:20px;font-weight:800;margin-top:3px;">109</div></div>
+                <div style="background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);"><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">TRAIN SPLIT</div><div style="font-size:20px;font-weight:800;color:var(--green);margin-top:3px;">80%</div></div>
+                <div style="background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);"><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">TEST SPLIT</div><div style="font-size:20px;font-weight:800;color:var(--blue2);margin-top:3px;">20%</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== SETTINGS PAGE ========== -->
+    <div class="page fade-in" id="page-settings">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">⚙ Settings</h2>
+        <p style="font-size:13px;color:var(--text3);">Configure model, notifications, and application preferences</p>
+      </div>
+      <div class="settings-grid">
+        <div class="setting-card">
+          <div class="setting-title">🤖 Model Settings</div>
+          <div class="setting-item"><div><div class="setting-label">Active Model</div><div class="setting-sub">Primary classification model</div></div><select class="dropdown"><option>DistilBERT</option><option>RoBERTa</option><option>SVM</option><option>Naive Bayes</option></select></div>
+          <div class="setting-item"><div><div class="setting-label">Confidence Threshold</div><div class="setting-sub">Min confidence for auto-classification</div></div><input class="input-field" type="number" value="75" min="50" max="99"/>%</div>
+          <div class="setting-item"><div><div class="setting-label">Real-time Mode</div><div class="setting-sub">Classify as you type</div></div><div class="toggle2" onclick="this.classList.toggle('off');showToast('Real-time mode toggled','⚡')"></div></div>
+          <div class="setting-item"><div><div class="setting-label">Auto-reply Generation</div><div class="setting-sub">Generate reply suggestions</div></div><div class="toggle2" onclick="this.classList.toggle('off')"></div></div>
+        </div>
+        <div class="setting-card">
+          <div class="setting-title">🔔 Notifications</div>
+          <div class="setting-item"><div><div class="setting-label">Critical Urgency Alerts</div><div class="setting-sub">Alert on CRITICAL tickets</div></div><div class="toggle2" onclick="this.classList.toggle('off')"></div></div>
+          <div class="setting-item"><div><div class="setting-label">Email Digest</div><div class="setting-sub">Daily summary email</div></div><div class="toggle2 off" onclick="this.classList.toggle('off')"></div></div>
+          <div class="setting-item"><div><div class="setting-label">Slack Integration</div><div class="setting-sub">Push to Slack channel</div></div><div class="toggle2 off" onclick="this.classList.toggle('off')"></div></div>
+          <div class="setting-item"><div><div class="setting-label">Webhook URL</div><div class="setting-sub">POST results to endpoint</div></div><input class="input-field" type="text" placeholder="https://..." style="width:160px;"/></div>
+        </div>
+        <div class="setting-card">
+          <div class="setting-title">🎨 Display</div>
+          <div class="setting-item"><div><div class="setting-label">Theme</div><div class="setting-sub">Dark / Light mode</div></div><select class="dropdown"><option>Dark</option><option>Light</option></select></div>
+          <div class="setting-item"><div><div class="setting-label">Language</div></div><select class="dropdown"><option>English</option><option>Hindi</option><option>Spanish</option></select></div>
+          <div class="setting-item"><div><div class="setting-label">Date Format</div></div><select class="dropdown"><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
+          <div class="setting-item"><div><div class="setting-label">Animate Charts</div></div><div class="toggle2" onclick="this.classList.toggle('off')"></div></div>
+        </div>
+        <div class="setting-card">
+          <div class="setting-title">💾 Data & Export</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn-analyze" style="width:100%;justify-content:center;padding:10px;" onclick="exportHistory()">⬇ Export History CSV</button>
+            <button class="btn-analyze" style="width:100%;justify-content:center;padding:10px;background:linear-gradient(135deg,var(--teal),var(--green));" onclick="showToast('Model export coming soon!','📦')">⬇ Export Model (.pkl)</button>
+            <button style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:var(--radius-sm);padding:10px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;" onclick="clearHistory();showToast('All data cleared','🗑')">🗑 Clear All Data</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+/* ===================================================================
+   DATA & STATE
+=================================================================== */
+const BASE_STATS = {
+  billing: 8245, technical: 9842, complaint: 4102, general: 2343,
+  urgLow: 18274, urgMedium: 3129, urgHigh: 2614, urgCritical: 515,
+  total: 24532
+};
+
+let session = {
+  billing: 0, technical: 0, complaint: 0, general: 0,
+  urgLow: 0, urgMedium: 0, urgHigh: 0, urgCritical: 0,
+  total: 0, confSum: 0
+};
+
+let ticketHistory = [];
+let donutChartInst, urgencyChartInst;
+
+/* ===================================================================
+   REPLY TEMPLATES
+=================================================================== */
+const AUTO_REPLIES = {
+  billing: "Thank you for contacting us about this billing concern. I've reviewed your account and have immediately flagged this issue to our finance team. A full refund will be processed within 3–5 business days and you'll receive a confirmation email shortly. We sincerely apologize for the inconvenience!",
+  technical: "I'm sorry you're experiencing this technical issue. Our engineering team has been notified and is actively investigating. In the meantime, please try: 1) Clear your cache & cookies 2) Restart the app 3) Check our status page. If the problem persists, I'll escalate this to Tier-2 support immediately.",
+  complaint: "I sincerely apologize for the experience you've had — this is not the standard of service we strive for, and your frustration is completely valid. I'm personally escalating your case to our senior Customer Success Manager who will reach out to you within 2 hours to make this right.",
+  general: "Thank you for reaching out! I'd be happy to help with your query. Could you please provide your account ID or order number so I can look into this faster? Our support team is available 24/7 and we'll do our best to resolve your concern promptly."
+};
+
+/* ===================================================================
+   PAGE NAVIGATION
+=================================================================== */
+const PAGE_TITLES = {
+  dashboard: 'Dashboard Overview',
+  predict: 'Predict Ticket',
+  batch: 'Batch Prediction',
+  analytics: 'Analytics',
+  history: 'Ticket History',
+  autoreply: 'Auto Reply Generator',
+  model: 'Model Performance',
+  settings: 'Settings'
+};
+
+function showPage(name, navEl) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) { page.classList.add('active'); page.classList.add('fade-in'); setTimeout(() => page.classList.remove('fade-in'), 400); }
+  if (navEl) navEl.classList.add('active');
+  document.getElementById('topbarSubtitle').textContent = PAGE_TITLES[name] || '';
+  closeSidebar();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
+function showLogout() { if (confirm('Are you sure you want to logout?')) showToast('Logged out successfully', '👋'); }
+
+/* ===================================================================
+   TOAST NOTIFICATIONS
+=================================================================== */
+function showToast(msg, icon = '✅') {
+  const old = document.querySelector('.toast');
+  if (old) old.remove();
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = `<span style="font-size:16px">${icon}</span><span>${msg}</span>`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+/* ===================================================================
+   HISTORY
+=================================================================== */
+function addToHistory(text, catLabel, urgLabel, confidence, sla) {
+  const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  ticketHistory.unshift({ text, catLabel, urgLabel, confidence, sla, ts, id: Date.now() });
+  renderHistory();
+  const badge = document.getElementById('historyBadge');
+  badge.textContent = ticketHistory.length;
+}
+
+function renderHistory() {
+  const tbody = document.getElementById('historyTbody');
+  if (!ticketHistory.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:30px;font-family:var(--mono);">No tickets classified yet. Use Predict Ticket to get started.</td></tr>';
+    return;
+  }
+  const tagClass = { billing: 'tag-billing', technical: 'tag-technical', complaint: 'tag-complaint', general: 'tag-general' };
+  const urgClass = { critical: 'u-critical', high: 'u-high', medium: 'u-medium', low: 'u-low' };
+  tbody.innerHTML = ticketHistory.map((item, i) => {
+    const conf = item.confidence;
+    const confColor = conf >= 85 ? 'var(--green)' : conf >= 70 ? 'var(--yellow)' : 'var(--red)';
+    return `<tr>
+      <td style="font-family:var(--mono);color:var(--text3)">${i + 1}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${item.ts}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${item.text}">${item.text.substring(0, 90)}${item.text.length > 90 ? '…' : ''}</td>
+      <td><span class="cat-tag ${tagClass[item.catLabel] || 'tag-general'}">${item.catLabel.toUpperCase()}</span></td>
+      <td><span class="urgency-pill ${urgClass[item.urgLabel] || 'u-low'}" style="font-size:10px;padding:3px 8px;">🔵 ${item.urgLabel.toUpperCase()}</span></td>
+      <td style="font-family:var(--mono);color:${confColor}">${conf}%</td>
+      <td style="font-size:11px;color:var(--text3);font-family:var(--mono);">${item.sla || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearHistory() {
+  ticketHistory = [];
+  renderHistory();
+  document.getElementById('historyBadge').textContent = '0';
+  showToast('History cleared', '🗑');
+}
+
+function exportHistory() {
+  if (!ticketHistory.length) { showToast('No history to export', '⚠️'); return; }
+  const rows = [['#', 'Timestamp', 'Message', 'Category', 'Urgency', 'Confidence', 'SLA'],
+    ...ticketHistory.map((item, i) => [i + 1, item.ts, `"${item.text}"`, item.catLabel, item.urgLabel, item.confidence + '%', item.sla || ''])];
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'ticket_history.csv';
+  a.click();
+  showToast('History exported!', '⬇');
+}
+
+/* ===================================================================
+   SESSION STATS & CHART UPDATES
+=================================================================== */
+function updateSessionStats(catLabel, urgLabel, confidence) {
+  // Increment counters
+  session.total++;
+  if (session.hasOwnProperty(catLabel)) session[catLabel]++;
+  const urgKey = 'urg' + urgLabel.charAt(0).toUpperCase() + urgLabel.slice(1);
+  if (session.hasOwnProperty(urgKey)) session[urgKey]++;
+  session.confSum += confidence;
+
+  // --- Update stat cards (base + session) ---
+  const tot = BASE_STATS.total + session.total;
+  animateValue('s-total', tot.toLocaleString());
+  animateValue('s-billing', (BASE_STATS.billing + session.billing).toLocaleString());
+  animateValue('s-tech', (BASE_STATS.technical + session.technical).toLocaleString());
+  animateValue('s-complaint', (BASE_STATS.complaint + session.complaint).toLocaleString());
+  const highUrgTotal = BASE_STATS.urgHigh + BASE_STATS.urgCritical + session.urgHigh + session.urgCritical;
+  animateValue('s-urgent', highUrgTotal.toLocaleString());
+
+  // Percentages
+  document.getElementById('s-billing-pct').textContent = ((BASE_STATS.billing + session.billing) / tot * 100).toFixed(1) + '% of total';
+  document.getElementById('s-tech-pct').textContent = ((BASE_STATS.technical + session.technical) / tot * 100).toFixed(1) + '% of total';
+  document.getElementById('s-complaint-pct').textContent = ((BASE_STATS.complaint + session.complaint) / tot * 100).toFixed(1) + '% of total';
+
+  // --- Update donut chart (TICKET DISTRIBUTION) ---
+  const newCatData = [
+    BASE_STATS.billing + session.billing,
+    BASE_STATS.technical + session.technical,
+    BASE_STATS.complaint + session.complaint,
+    BASE_STATS.general + session.general
+  ];
+  donutChartInst.data.datasets[0].data = newCatData;
+  donutChartInst.update('active');
+
+  // Update legend values
+  document.getElementById('leg-billing').textContent = (BASE_STATS.billing + session.billing).toLocaleString();
+  document.getElementById('leg-technical').textContent = (BASE_STATS.technical + session.technical).toLocaleString();
+  document.getElementById('leg-complaint').textContent = (BASE_STATS.complaint + session.complaint).toLocaleString();
+  document.getElementById('leg-general').textContent = (BASE_STATS.general + session.general).toLocaleString();
+
+  // --- Update urgency chart (URGENCY DISTRIBUTION) ---
+  const newUrgData = [
+    BASE_STATS.urgLow + session.urgLow,
+    BASE_STATS.urgMedium + session.urgMedium,
+    BASE_STATS.urgHigh + session.urgHigh,
+    BASE_STATS.urgCritical + session.urgCritical
+  ];
+  urgencyChartInst.data.datasets[0].data = newUrgData;
+  urgencyChartInst.update('active');
+
+  // Update urgency legend
+  document.getElementById('leg-urg-low').textContent = newUrgData[0].toLocaleString();
+  document.getElementById('leg-urg-medium').textContent = newUrgData[1].toLocaleString();
+  document.getElementById('leg-urg-high').textContent = newUrgData[2].toLocaleString();
+  document.getElementById('leg-urg-critical').textContent = newUrgData[3].toLocaleString();
+
+  // --- Update analytics page session stats ---
+  document.getElementById('an-total').textContent = session.total;
+  document.getElementById('an-urgent').textContent = session.urgHigh + session.urgCritical;
+  document.getElementById('an-conf').textContent = Math.round(session.confSum / session.total) + '%';
+  const topCat = ['billing', 'technical', 'complaint', 'general'].reduce((a, b) => session[a] > session[b] ? a : b);
+  document.getElementById('an-topcat').textContent = topCat.charAt(0).toUpperCase() + topCat.slice(1);
+
+  // Sidebar session count
+  document.getElementById('sidebarSessionCount').textContent = session.total;
+  document.getElementById('sidebarAccSub').textContent = `Last: ${catLabel} · ${urgLabel} urgency`;
+}
+
+function filterDistributionChart(mode) {
+  if (mode === 'session') {
+    donutChartInst.data.datasets[0].data = [session.billing, session.technical, session.complaint, session.general];
+    document.getElementById('leg-billing').textContent = session.billing;
+    document.getElementById('leg-technical').textContent = session.technical;
+    document.getElementById('leg-complaint').textContent = session.complaint;
+    document.getElementById('leg-general').textContent = session.general;
+  } else {
+    donutChartInst.data.datasets[0].data = [BASE_STATS.billing + session.billing, BASE_STATS.technical + session.technical, BASE_STATS.complaint + session.complaint, BASE_STATS.general + session.general];
+    document.getElementById('leg-billing').textContent = (BASE_STATS.billing + session.billing).toLocaleString();
+    document.getElementById('leg-technical').textContent = (BASE_STATS.technical + session.technical).toLocaleString();
+    document.getElementById('leg-complaint').textContent = (BASE_STATS.complaint + session.complaint).toLocaleString();
+    document.getElementById('leg-general').textContent = (BASE_STATS.general + session.general).toLocaleString();
+  }
+  donutChartInst.update();
+}
+
+function filterUrgencyChart(mode) {
+  if (mode === 'session') {
+    urgencyChartInst.data.datasets[0].data = [session.urgLow, session.urgMedium, session.urgHigh, session.urgCritical];
+    document.getElementById('leg-urg-low').textContent = session.urgLow;
+    document.getElementById('leg-urg-medium').textContent = session.urgMedium;
+    document.getElementById('leg-urg-high').textContent = session.urgHigh;
+    document.getElementById('leg-urg-critical').textContent = session.urgCritical;
+  } else {
+    const d = [BASE_STATS.urgLow + session.urgLow, BASE_STATS.urgMedium + session.urgMedium, BASE_STATS.urgHigh + session.urgHigh, BASE_STATS.urgCritical + session.urgCritical];
+    urgencyChartInst.data.datasets[0].data = d;
+    document.getElementById('leg-urg-low').textContent = d[0].toLocaleString();
+    document.getElementById('leg-urg-medium').textContent = d[1].toLocaleString();
+    document.getElementById('leg-urg-high').textContent = d[2].toLocaleString();
+    document.getElementById('leg-urg-critical').textContent = d[3].toLocaleString();
+  }
+  urgencyChartInst.update();
+}
+
+function animateValue(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val;
+  el.classList.remove('count-updated');
+  void el.offsetWidth;
+  el.classList.add('count-updated');
+}
+
+/* ===================================================================
+   API CALL
+=================================================================== */
+async function callAPI(text) {
+  const response = await fetch('/api/classify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  if (!response.ok) throw new Error('Server error ' + response.status);
+  return await response.json();
+}
+
+function getKeywords(text) {
+  const stop = new Set(['i','me','my','we','our','you','he','she','they','it','the','a','an','and','or','but','in','on','at','to','for','of','with','by','is','was','are','were','be','been','have','has','had','do','did','will','would','could','should','can','this','that','these','those','am','not','no','so','if','then','from','as','up','out','about','just','more','also','very','when','how','what','there','their','its','your','his','her']);
+  const words = text.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w => w.length > 3 && !stop.has(w) && !w.startsWith('@'));
+  const freq = {}; words.forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+  return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 6).map(e => e[0]);
+}
+
+/* ===================================================================
+   MAIN ANALYZE (Dashboard)
+=================================================================== */
+async function analyzeMain() {
+  const text = document.getElementById('mainTextarea').value.trim();
+  if (!text) { showToast('Please enter a ticket message', '⚠️'); return; }
+
+  const btn = document.getElementById('mainAnalyzeBtn');
+  const spin = document.getElementById('mainSpin');
+  const btxt = document.getElementById('mainBtnTxt');
+  btn.disabled = true; spin.style.display = 'block'; btxt.textContent = 'Analyzing...';
+  document.getElementById('mainEmpty').style.display = 'none';
+  document.getElementById('mainResultContent').style.display = 'none';
+
+  try {
+    const result = await callAPI(text);
+    const cat = result.category;
+    const urg = result.urgency;
+
+    // Category
+    document.getElementById('mainCatValue').textContent = cat.label.toUpperCase();
+    document.getElementById('mainCatValue').style.color = cat.color;
+
+    // Urgency pill
+    const up = document.getElementById('mainUrgPill');
+    up.textContent = urg.icon + ' ' + urg.label.toUpperCase();
+    up.className = 'urgency-pill u-' + urg.label;
+
+    // Confidence
+    document.getElementById('mainConfVal').textContent = cat.confidence + '%';
+    setTimeout(() => { document.getElementById('mainConfBar').style.width = cat.confidence + '%'; }, 60);
+
+    // Keywords
+    const kws = getKeywords(text);
+    document.getElementById('mainKeywords').innerHTML = kws.map(k => `<span class="kw-tag">${k}</span>`).join('');
+
+    document.getElementById('mainResultContent').style.display = 'block';
+
+    // Auto-reply
+    const catKey = cat.label.toLowerCase();
+    document.getElementById('mainActionText').textContent = result.recommended_action;
+    document.getElementById('mainAutoReplyText').textContent = AUTO_REPLIES[catKey] || AUTO_REPLIES.general;
+    document.getElementById('mainAutoReply').style.display = 'block';
+
+    // Update all stats & charts
+    updateSessionStats(catKey, urg.label, cat.confidence);
+    addToHistory(text, catKey, urg.label, cat.confidence, urg.sla);
+    addLiveTicket(text, catKey, cat.color);
+
+    // Alert if critical
+    if (urg.label === 'critical') showToast('⚠️ CRITICAL urgency ticket classified!', '🔴');
+    else showToast('Ticket classified successfully', '✅');
+
+  } catch (err) {
+    showToast('Error: ' + err.message + '. Check if Flask server is running.', '❌');
+    document.getElementById('mainEmpty').style.display = 'block';
+  } finally {
+    btn.disabled = false; spin.style.display = 'none'; btxt.textContent = '✨ Analyze Ticket';
+  }
+}
+
+function clearMain() {
+  document.getElementById('mainTextarea').value = '';
+  document.getElementById('mainEmpty').style.display = 'block';
+  document.getElementById('mainResultContent').style.display = 'none';
+  document.getElementById('mainAutoReply').style.display = 'none';
+  document.getElementById('mainCharCount').textContent = '0/500';
+}
+
+/* ===================================================================
+   PREDICT PAGE ANALYZE
+=================================================================== */
+async function analyzeP2() {
+  const text = document.getElementById('p2Textarea').value.trim();
+  if (!text) { showToast('Please enter a ticket message', '⚠️'); return; }
+
+  const btn = document.getElementById('p2AnalyzeBtn');
+  const spin = document.getElementById('p2Spin');
+  const btxt = document.getElementById('p2BtnTxt');
+  btn.disabled = true; spin.style.display = 'block'; btxt.textContent = 'Analyzing...';
+  document.getElementById('p2Empty').style.display = 'none';
+  document.getElementById('p2ResultContent').style.display = 'none';
+
+  try {
+    const result = await callAPI(text);
+    const cat = result.category;
+    const urg = result.urgency;
+    const kws = getKeywords(text);
+
+    const fills = { billing: 'fill-blue', technical: 'fill-purple', complaint: 'fill-red', general: 'fill-teal' };
+    const urgColors = { critical: 'var(--red)', high: 'var(--orange)', medium: 'var(--yellow)', low: 'var(--green)' };
+
+    // Build breakdown bars from result.category.breakdown
+    const breakdown = cat.breakdown || {};
+    const sortedCats = Object.entries(breakdown).sort((a, b) => b[1] - a[1]);
+
+    let html = `
+      <div class="result-top">
+        <div class="result-cat-wrap">
+          <div class="result-cat-label">Category</div>
+          <div class="result-cat-value" style="color:${cat.color}">${cat.label.toUpperCase()}</div>
+        </div>
+        <div>
+          <div class="result-cat-label" style="text-align:right">Urgency</div>
+          <div class="urgency-pill u-${urg.label}" style="margin-top:3px">${urg.icon} ${urg.label.toUpperCase()}</div>
+        </div>
+      </div>
+      <div class="big-conf">
+        <div class="big-conf-label">Category Confidence</div>
+        <div class="big-conf-val">${cat.confidence}%</div>
+        <div class="conf-bar-big"><div class="conf-fill-big" id="p2ConfFill" style="width:0%"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div style="background:var(--bg3);border-radius:8px;padding:10px;border:1px solid var(--border);text-align:center;">
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px;">Urgency Conf.</div>
+          <div style="font-size:20px;font-weight:800;color:${urgColors[urg.label]}">${urg.confidence}%</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:8px;padding:10px;border:1px solid var(--border);text-align:center;">
+          <div style="font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px;">SLA Target</div>
+          <div style="font-size:16px;font-weight:800;color:var(--text)">${urg.sla}</div>
+        </div>
+      </div>`;
+
+    // Category breakdown bars
+    if (sortedCats.length) {
+      html += `<div style="font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px;">Category Breakdown</div>`;
+      sortedCats.forEach(([c, pct]) => {
+        const f = fills[c] || 'fill-blue';
+        html += `<div style="margin-bottom:8px"><div class="conf-row"><span style="text-transform:capitalize">${c}</span><span>${pct}%</span></div><div class="conf-bar"><div class="conf-fill ${f}" id="p2bar-${c}" style="width:0%"></div></div></div>`;
+      });
+    }
+
+    // Urgency breakdown
+    const urgBreakdown = urg.breakdown || {};
+    const sortedUrg = Object.entries(urgBreakdown).sort((a, b) => b[1] - a[1]);
+    if (sortedUrg.length) {
+      html += `<div style="font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin:10px 0 8px;">Urgency Breakdown</div>`;
+      sortedUrg.forEach(([u, pct]) => {
+        const col = urgColors[u] || 'var(--text)';
+        html += `<div style="margin-bottom:8px"><div class="conf-row"><span style="color:${col};text-transform:capitalize">${u}</span><span>${pct}%</span></div><div class="conf-bar"><div class="conf-fill" id="p2urgbar-${u}" style="width:0%;background:${col}"></div></div></div>`;
+      });
+    }
+
+    // Keywords + Action
+    html += `<div style="font-size:11px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin:10px 0 7px">Keywords</div>`;
+    html += `<div class="keywords-row">${kws.map(k => `<span class="kw-tag">${k}</span>`).join('')}</div>`;
+    html += `<div style="margin-top:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Recommended Action</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6">${result.recommended_action}</div>
+    </div>`;
+    html += `<div style="margin-top:10px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Suggested Reply</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6">${AUTO_REPLIES[cat.label.toLowerCase()] || AUTO_REPLIES.general}</div>
+    </div>`;
+
+    const rc = document.getElementById('p2ResultContent');
+    rc.innerHTML = html; rc.style.display = 'block';
+
+    setTimeout(() => {
+      const cf = document.getElementById('p2ConfFill'); if (cf) cf.style.width = cat.confidence + '%';
+      sortedCats.forEach(([c, pct]) => { const el = document.getElementById('p2bar-' + c); if (el) el.style.width = pct + '%'; });
+      sortedUrg.forEach(([u, pct]) => { const el = document.getElementById('p2urgbar-' + u); if (el) el.style.width = pct + '%'; });
+    }, 60);
+
+    // Update global session stats
+    updateSessionStats(cat.label.toLowerCase(), urg.label, cat.confidence);
+    addToHistory(text, cat.label.toLowerCase(), urg.label, cat.confidence, urg.sla);
+    addLiveTicket(text, cat.label.toLowerCase(), cat.color);
+    if (urg.label === 'critical') showToast('⚠️ CRITICAL urgency ticket!', '🔴');
+    else showToast('Full analysis complete', '✅');
+
+  } catch (err) {
+    showToast('Error: ' + err.message, '❌');
+    document.getElementById('p2Empty').style.display = 'block';
+  } finally {
+    btn.disabled = false; spin.style.display = 'none'; btxt.textContent = '✨ Analyze';
+  }
+}
+
+/* ===================================================================
+   LIVE FEED
+=================================================================== */
+const LIVE_SAMPLES = [
+  { text: "I can't login to my account after the update", cat: 'technical', color: 'var(--purple)' },
+  { text: "Why was I charged again this month?", cat: 'billing', color: 'var(--blue)' },
+  { text: "This is the worst service I've ever had!", cat: 'complaint', color: 'var(--red)' },
+  { text: "App keeps crashing on my iPhone", cat: 'technical', color: 'var(--purple)' },
+  { text: "Need a refund for my cancelled order", cat: 'billing', color: 'var(--blue)' },
+  { text: "Your customer service is absolutely terrible", cat: 'complaint', color: 'var(--red)' },
+  { text: "When will my delivery arrive?", cat: 'general', color: 'var(--teal)' },
+  { text: "Password reset email never arrived", cat: 'technical', color: 'var(--purple)' },
+  { text: "Charged twice for single transaction", cat: 'billing', color: 'var(--blue)' },
+];
+const TAG_CLASS = { billing: 'tag-billing', technical: 'tag-technical', complaint: 'tag-complaint', general: 'tag-general' };
+let liveIdx = 0;
+
+function addLiveItem() {
+  const item = LIVE_SAMPLES[liveIdx % LIVE_SAMPLES.length]; liveIdx++;
+  const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const feed = document.getElementById('liveFeed');
+  const div = document.createElement('div');
+  div.className = 'live-item';
+  div.innerHTML = `<div class="live-dot" style="background:${item.color}"></div><div class="live-text">${item.text}</div><span class="cat-tag ${TAG_CLASS[item.cat]}">${item.cat.toUpperCase()}</span><div class="live-time">${ts}</div>`;
+  feed.prepend(div);
+  if (feed.children.length > 6) feed.removeChild(feed.lastChild);
+}
+
+function addLiveTicket(text, cat, color) {
+  const ts = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const feed = document.getElementById('liveFeed');
+  const div = document.createElement('div');
+  div.className = 'live-item';
+  div.style.borderLeft = '2px solid var(--blue)';
+  div.style.paddingLeft = '8px';
+  div.innerHTML = `<div class="live-dot" style="background:${color}"></div><div class="live-text" style="color:var(--text)">${text.substring(0, 60)}…</div><span class="cat-tag ${TAG_CLASS[cat] || 'tag-general'}">${cat.toUpperCase()}</span><div class="live-time">${ts}</div>`;
+  feed.prepend(div);
+  if (feed.children.length > 8) feed.removeChild(feed.lastChild);
+}
+setInterval(addLiveItem, 4000);
+addLiveItem(); addLiveItem(); addLiveItem();
+
+/* ===================================================================
+   AUTO REPLY PAGE
+=================================================================== */
+async function generateReply() {
+  const text = document.getElementById('arTextarea').value.trim();
+  if (!text) { showToast('Please enter a message', '⚠️'); return; }
+  const spin = document.getElementById('arSpin'); const btxt = document.getElementById('arBtnTxt');
+  const btn = document.getElementById('arBtn');
+  btn.disabled = true; spin.style.display = 'block'; btxt.textContent = 'Generating...';
+
+  try {
+    const result = await callAPI(text);
+    const cat = result.category;
+    const urg = result.urgency;
+    const catKey = cat.label.toLowerCase();
+    const reply = AUTO_REPLIES[catKey] || AUTO_REPLIES.general;
+
+    document.getElementById('arReplyArea').innerHTML = `
+      <div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        <span class="cat-tag ${TAG_CLASS[catKey] || 'tag-general'}">${cat.label.toUpperCase()}</span>
+        <span class="urgency-pill u-${urg.label}" style="font-size:10px;padding:3px 8px;">${urg.icon} ${urg.label.toUpperCase()}</span>
+        <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">${cat.confidence}% conf.</span>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:14px;font-size:13px;color:var(--text2);line-height:1.7;border:1px solid var(--border);margin-bottom:12px">${reply}</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-family:var(--mono);">Recommended Action: ${result.recommended_action}</div>
+      <button class="btn-use-reply" onclick="navigator.clipboard.writeText(\`${reply.replace(/`/g, "'")}\`).then(()=>{this.textContent='✓ Copied!';setTimeout(()=>this.innerHTML='📋 Copy Reply',1500)})">
+        📋 Copy Reply
+      </button>`;
+    showToast('Reply generated!', '💬');
+  } catch (err) {
+    showToast('Error: ' + err.message, '❌');
+  } finally {
+    btn.disabled = false; spin.style.display = 'none'; btxt.textContent = '💬 Generate Reply';
+  }
+}
+
+const TEMPLATES = [
+  { title: 'Billing Issue', icon: '💳', cat: 'billing' },
+  { title: 'Technical Support', icon: '🔧', cat: 'technical' },
+  { title: 'Complaint Response', icon: '🙏', cat: 'complaint' },
+  { title: 'General Inquiry', icon: '💬', cat: 'general' },
+];
+document.getElementById('replyTemplates').innerHTML = TEMPLATES.map(t => `
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.2s"
+    onmouseenter="this.style.borderColor='var(--border2)'" onmouseleave="this.style.borderColor='var(--border)'"
+    onclick="document.getElementById('arTextarea').value='${t.title} related issue — please help me urgently';document.getElementById('arReplyArea').innerHTML='<div style=\\'background:var(--bg3);border-radius:8px;padding:14px;font-size:13px;color:var(--text2);line-height:1.7;border:1px solid var(--border)\\'>${AUTO_REPLIES[t.cat].replace(/'/g, "\\'")}</div>'">
+    <div style="font-size:18px;margin-bottom:6px">${t.icon}</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:4px">${t.title}</div>
+    <div style="font-size:11px;color:var(--text3)">${AUTO_REPLIES[t.cat].substring(0, 65)}...</div>
+  </div>`).join('');
+
+function copyReply() {
+  const txt = document.getElementById('mainAutoReplyText').textContent;
+  navigator.clipboard.writeText(txt).then(() => showToast('Reply copied!', '📋'));
+}
+
+/* ===================================================================
+   BATCH CSV
+=================================================================== */
+function handleCSV(input) {
+  if (!input.files.length) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split('\n').filter(l => l.trim());
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const textCol = headers.findIndex(h => ['text', 'tweet_text', 'message', 'content'].includes(h.toLowerCase()));
+    const dataLines = lines.slice(1, Math.min(51, lines.length));
+
+    // Use local keyword-based classify for batch (no API to avoid rate limits)
+    const CATS_LOCAL = { billing: ['charge','charged','payment','refund','invoice','bill','paid','fee','subscription','credit','duplicate','money','twice','receipt'], technical: ['crash','error','bug','fix','broken','install','update','app','freeze','login','password','server','not working','down'], complaint: ['terrible','horrible','awful','worst','unacceptable','never again','disappointed','rude','furious','angry','frustrated','hate'], general: ['when','where','how','what','can you','do you','question','info','information','help'] };
+    const URGENCY_LOCAL = { critical: ['emergency','hack','hacked','stolen','fraud'], high: ['immediately','asap','urgent','cant work','system down','right now'], medium: ['broken','crash','not working','delayed','cancelled','terrible'], low: ['when','question','curious','love','great','thanks'] };
+
+    const results = dataLines.map((line, i) => {
+      const cols = line.split(',');
+      const text = (cols[textCol > -1 ? textCol : 0] || '').replace(/"/g, '') || 'Sample ticket ' + i;
+      const t = text.toLowerCase();
+      let scores = {}; for (const [c, kws] of Object.entries(CATS_LOCAL)) { scores[c] = kws.filter(k => t.includes(k)).length + Math.random() * 0.3; }
+      const cat = Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0];
+      const tot = Object.values(scores).reduce((a, b) => a + b, 0) || 1;
+      const conf = Math.round(Math.min(98, Math.max(55, (scores[cat] / tot) * 100 + 40)));
+      let urg = 'low'; for (const [u, ws] of Object.entries(URGENCY_LOCAL)) { if (ws.some(w => t.includes(w))) { urg = u; break; } }
+      const slaMap = { critical: '< 1 hour', high: '< 4 hours', medium: '< 24 hours', low: '< 72 hours' };
+      return { text, cat, urg, conf, sla: slaMap[urg] };
+    });
+
+    document.getElementById('batchCount').textContent = `(${results.length} rows)`;
+    const tbody = document.getElementById('batchTbody');
+    tbody.innerHTML = results.map((r, i) => `<tr>
+      <td style="font-family:var(--mono);color:var(--text3)">${i + 1}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${r.text.substring(0, 70)}</td>
+      <td><span class="cat-tag ${TAG_CLASS[r.cat] || 'tag-general'}">${r.cat.toUpperCase()}</span></td>
+      <td><span class="urgency-pill u-${r.urg}" style="font-size:10px;padding:3px 8px;">${r.urg.toUpperCase()}</span></td>
+      <td style="font-family:var(--mono);color:${r.conf >= 85 ? 'var(--green)' : r.conf >= 70 ? 'var(--yellow)' : 'var(--red)'}">${r.conf}%</td>
+      <td style="font-size:11px;color:var(--text3)">${r.sla}</td>
+    </tr>`).join('');
+    document.getElementById('batchResults').style.display = 'block';
+    window._batchResults = results;
+    showToast(`${results.length} tickets classified!`, '📦');
+  };
+  reader.readAsText(file);
+}
+
+function downloadResults() {
+  if (!window._batchResults) return;
+  const rows = [['Text', 'Category', 'Urgency', 'Confidence', 'SLA'], ...window._batchResults.map(r => [`"${r.text}"`, r.cat, r.urg, r.conf + '%', r.sla])];
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = 'classified_tickets.csv'; a.click();
+  showToast('CSV downloaded!', '⬇');
+}
+
+/* ===================================================================
+   UTILS
+=================================================================== */
+function updateCharCount(el, countId, max) { document.getElementById(countId).textContent = el.value.length + '/' + max; }
+function updateDatetime() {
+  const now = new Date();
+  document.getElementById('datetimeDisplay').innerHTML = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ' | ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+updateDatetime(); setInterval(updateDatetime, 1000);
+
+/* ===================================================================
+   SAMPLE TICKETS
+=================================================================== */
+const SAMPLES = [
+  { label: 'billing', text: "@Uber I was charged twice for the same ride! $47.50 duplicate charge on my card. This is fraud, fix it immediately!" },
+  { label: 'technical', text: "@AmazonHelp app crashes every time I try to checkout. Already reinstalled 3 times. Order deadline is tonight!" },
+  { label: 'complaint', text: "@Delta absolutely terrible experience. Flight delayed 6 hours, no updates, staff completely rude. Will never fly again!" },
+  { label: 'general', text: "@Netflix when will season 3 be released? Can't find any info about it anywhere." },
+];
+document.getElementById('sampleTickets').innerHTML = SAMPLES.map(s => `
+  <div onclick="document.getElementById('p2Textarea').value='${s.text.replace(/'/g, "\\'")}';updateCharCount(document.getElementById('p2Textarea'),'p2CharCount',1000)"
+    style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;cursor:pointer;font-size:12px;color:var(--text2);transition:all 0.18s;line-height:1.5;"
+    onmouseenter="this.style.borderColor='var(--border2)'" onmouseleave="this.style.borderColor='var(--border)'">
+    <span class="cat-tag ${TAG_CLASS[s.label]}" style="margin-right:6px;">${s.label.toUpperCase()}</span>${s.text.substring(0, 58)}…
+  </div>`).join('');
+
+/* ===================================================================
+   CHARTS
+=================================================================== */
+Chart.defaults.color = '#9499c4';
+Chart.defaults.borderColor = '#2a2d45';
+Chart.defaults.font.family = "'Plus Jakarta Sans',sans-serif";
+
+// Donut — Ticket Distribution
+donutChartInst = new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Billing', 'Technical', 'Complaint', 'General'],
+    datasets: [{ data: [BASE_STATS.billing, BASE_STATS.technical, BASE_STATS.complaint, BASE_STATS.general], backgroundColor: ['#4f7cff', '#9b59f5', '#ff4d6d', '#ffd166'], borderWidth: 0, hoverOffset: 8 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw.toLocaleString()} tickets` } } }, cutout: '70%', animation: { duration: 800 } }
+});
+
+// Donut — Urgency Distribution (4-segment)
+urgencyChartInst = new Chart(document.getElementById('urgencyChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Low', 'Medium', 'High', 'Critical'],
+    datasets: [{ data: [BASE_STATS.urgLow, BASE_STATS.urgMedium, BASE_STATS.urgHigh, BASE_STATS.urgCritical], backgroundColor: ['#06d6a0', '#ffd166', '#ff8c42', '#ff4d6d'], borderWidth: 0, hoverOffset: 8 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw.toLocaleString()} tickets` } } }, cutout: '70%', animation: { duration: 800 } }
+});
+
+// Line Chart
+new Chart(document.getElementById('lineChart'), {
+  type: 'line',
+  data: {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      { label: 'Billing', data: [320, 285, 410, 395, 440, 380, 425], borderColor: '#4f7cff', backgroundColor: 'rgba(79,124,255,0.08)', tension: 0.4, fill: true, pointRadius: 3 },
+      { label: 'Technical', data: [410, 380, 520, 490, 530, 445, 510], borderColor: '#9b59f5', backgroundColor: 'rgba(155,89,245,0.08)', tension: 0.4, fill: true, pointRadius: 3 },
+      { label: 'Complaint', data: [140, 165, 120, 185, 160, 140, 155], borderColor: '#ff4d6d', backgroundColor: 'rgba(255,77,109,0.08)', tension: 0.4, fill: true, pointRadius: 3 },
+    ]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } } }, scales: { x: { grid: { color: 'rgba(42,45,69,0.5)' } }, y: { grid: { color: 'rgba(42,45,69,0.5)' } } }, animation: { duration: 1000 } }
+});
+
+// Sentiment Chart
+new Chart(document.getElementById('sentimentChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      { label: 'Positive', data: [45, 52, 38, 60, 48, 55, 62], backgroundColor: 'rgba(6,214,160,0.7)', borderRadius: 4 },
+      { label: 'Negative', data: [35, 28, 42, 25, 37, 30, 28], backgroundColor: 'rgba(255,77,109,0.7)', borderRadius: 4 },
+      { label: 'Neutral', data: [20, 20, 20, 15, 15, 15, 10], backgroundColor: 'rgba(148,153,196,0.5)', borderRadius: 4 },
+    ]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 11 } } } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: 'rgba(42,45,69,0.5)' } } }, animation: { duration: 1000 } }
+});
+
+// Hourly Chart
+new Chart(document.getElementById('hourlyChart'), {
+  type: 'bar',
+  data: {
+    labels: ['0h', '3h', '6h', '9h', '12h', '15h', '18h', '21h'],
+    datasets: [{ label: 'Tickets', data: [12, 8, 15, 82, 145, 168, 132, 95], backgroundColor: ctx => ctx.dataIndex === 5 ? 'rgba(79,124,255,0.9)' : 'rgba(79,124,255,0.4)', borderRadius: 6 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: 'rgba(42,45,69,0.5)' } } }, animation: { duration: 1000 } }
+});
+</script>
+</body>
+</html>
